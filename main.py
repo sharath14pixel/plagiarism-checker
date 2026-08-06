@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -38,10 +39,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS – allow the Next.js frontend on localhost:3000 ───────────────────
+# ── CORS – configurable origins for production/development ───────────────────
+raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
+origins = [org.strip() for org in raw_origins.split(",") if org.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
