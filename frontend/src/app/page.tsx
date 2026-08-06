@@ -2,11 +2,30 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  UploadCloud, 
+  FileText, 
+  CheckCircle2, 
+  AlertCircle, 
+  Globe, 
+  ShieldAlert, 
+  Bot, 
+  Sparkles, 
+  X, 
+  ArrowRight,
+  Zap,
+  Lock,
+  Search
+} from "lucide-react";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [enableWebSearch, setEnableWebSearch] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -17,23 +36,46 @@ export default function Home() {
     }
   };
 
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragActive(false);
+  };
+
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setFile(e.dataTransfer.files[0]);
-      setError(null);
+      const droppedFile = e.dataTransfer.files[0];
+      const ext = droppedFile.name.split('.').pop()?.toLowerCase();
+      if (['pdf', 'docx', 'txt'].includes(ext || '')) {
+        setFile(droppedFile);
+        setError(null);
+      } else {
+        setError("Invalid file format. Please upload a PDF, DOCX, or TXT file.");
+      }
     }
+  };
+
+  const removeFile = () => {
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
-      setError("Please select a file first.");
+      setError("Please select a document to scan.");
       return;
     }
 
     setLoading(true);
     setError(null);
+    setLoadingStep(1);
 
     const token = localStorage.getItem("access_token");
     if (!token) {
@@ -43,7 +85,11 @@ export default function Home() {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("enable_web_search", "true");
+    formData.append("enable_web_search", enableWebSearch ? "true" : "false");
+
+    // Progress simulation interval
+    const stepTimer1 = setTimeout(() => setLoadingStep(2), 1200);
+    const stepTimer2 = setTimeout(() => setLoadingStep(3), 3000);
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -54,6 +100,9 @@ export default function Home() {
         },
         body: formData,
       });
+
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
 
       if (response.status === 401) {
         localStorage.removeItem("access_token");
@@ -66,87 +115,275 @@ export default function Home() {
         throw new Error(errData?.detail || `Server error: ${response.status}`);
       }
 
+      setLoadingStep(4);
       const data = await response.json();
-      router.push(`/reports/${data.report_id}`);
+      setTimeout(() => {
+        router.push(`/reports/${data.report_id}`);
+      }, 500);
+
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+      setError(err.message || "An unexpected error occurred during processing.");
       setLoading(false);
+      setLoadingStep(0);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto mt-12 bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Check Document</h1>
-        <p className="text-gray-500">Upload a PDF, DOCX, or TXT file for plagiarism and AI detection</p>
+    <div className="space-y-12 max-w-5xl mx-auto py-4">
+      
+      {/* Hero Header */}
+      <div className="text-center space-y-4 max-w-3xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }} 
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold uppercase tracking-wider"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin-slow" />
+          <span>Next-Gen Document Intelligence</span>
+        </motion.div>
+        
+        <motion.h1 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight"
+        >
+          Detect Plagiarism & <br className="hidden sm:inline" />
+          <span className="text-gradient">Verify AI Generation</span>
+        </motion.h1>
+
+        <motion.p 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto"
+        >
+          Upload academic papers, essays, or technical documents. Get sub-second similarity matching, deep-web source extraction, and neural AI linguistic analysis.
+        </motion.p>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div 
-          className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
-            file ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-          }`}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept=".pdf,.docx,.txt"
-          />
+      {/* Main Upload Card */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="glass-panel rounded-2xl p-6 sm:p-10 border border-slate-800/80 shadow-2xl relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
+
+        <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
           
-          {file ? (
-            <div className="space-y-2">
-              <svg className="mx-auto h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-lg font-medium text-gray-900">{file.name}</p>
-              <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <div className="text-gray-600">
-                <span className="font-semibold text-blue-600 hover:text-blue-500">Click to upload</span> or drag and drop
+          {/* Drag & Drop Zone */}
+          <div 
+            className={`relative border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 cursor-pointer ${
+              dragActive 
+                ? 'border-indigo-400 bg-indigo-500/10 scale-[1.01]' 
+                : file 
+                  ? 'border-indigo-500/50 bg-slate-900/60' 
+                  : 'border-slate-700/80 hover:border-slate-500 bg-slate-900/40 hover:bg-slate-900/60'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => !file && fileInputRef.current?.click()}
+          >
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              className="hidden" 
+              accept=".pdf,.docx,.txt"
+            />
+            
+            <AnimatePresence mode="wait">
+              {file ? (
+                <motion.div 
+                  key="file-selected"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-800/80 border border-slate-700/80 max-w-xl mx-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-lg bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                      <FileText className="w-6 h-6 text-indigo-400" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">{file.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB • {file.name.split('.').pop()?.toUpperCase()}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={removeFile}
+                      className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-700/60 transition-colors"
+                      title="Remove document"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="drop-prompt"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mx-auto shadow-inner group-hover:scale-110 transition-transform">
+                    <UploadCloud className="w-8 h-8 text-indigo-400" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-medium text-slate-200">
+                      <span className="text-indigo-400 font-semibold hover:underline">Click to upload</span> or drag and drop document
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">Supports PDF, DOCX, and TXT (up to 20MB)</p>
+                  </div>
+                  
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    {['PDF', 'DOCX', 'TXT'].map((ext) => (
+                      <span key={ext} className="px-2.5 py-1 rounded-md bg-slate-800 text-[11px] font-mono text-slate-400 border border-slate-700/60">
+                        .{ext}
+                      </span>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Options & Settings */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/50 border border-slate-800/80">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${enableWebSearch ? 'bg-cyan-500/10 text-cyan-400' : 'bg-slate-800 text-slate-500'}`}>
+                <Globe className="w-5 h-5" />
               </div>
-              <p className="text-xs text-gray-500">PDF, DOCX, or TXT</p>
+              <div className="text-left">
+                <p className="text-sm font-medium text-slate-200">Deep Web & Academic Index Search</p>
+                <p className="text-xs text-slate-400">Cross-reference document against web sources & research repositories</p>
+              </div>
+            </div>
+
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input 
+                type="checkbox" 
+                checked={enableWebSearch}
+                onChange={(e) => setEnableWebSearch(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm"
+            >
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+              <span>{error}</span>
+            </motion.div>
+          )}
+
+          {/* Processing Steps Loading Visualizer */}
+          {loading && (
+            <div className="space-y-3 p-5 rounded-xl bg-indigo-950/40 border border-indigo-500/20">
+              <div className="flex items-center justify-between text-xs text-indigo-300 font-medium">
+                <span className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+                  Analyzing document structure...
+                </span>
+                <span>{loadingStep * 25}%</span>
+              </div>
+              
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400"
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${loadingStep * 25}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] text-slate-400">
+                <span className={loadingStep >= 1 ? "text-indigo-300 font-medium" : ""}>1. Extracting Text</span>
+                <span className={loadingStep >= 2 ? "text-indigo-300 font-medium" : ""}>2. Vector Matching</span>
+                <span className={loadingStep >= 3 ? "text-indigo-300 font-medium" : ""}>3. AI Perplexity Scan</span>
+                <span className={loadingStep >= 4 ? "text-indigo-300 font-medium" : ""}>4. Final Report</span>
+              </div>
             </div>
           )}
-        </div>
 
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-100">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-8">
+          {/* Submit Action */}
           <button
             type="submit"
             disabled={!file || loading}
-            className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${
-              (!file || loading) ? 'opacity-50 cursor-not-allowed' : ''
+            className={`w-full flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-semibold text-white shadow-xl transition-all duration-300 ${
+              !file || loading
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                : 'bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-700 hover:from-indigo-500 hover:to-blue-500 shadow-indigo-600/30 hover:shadow-indigo-500/50 hover:scale-[1.005]'
             }`}
           >
             {loading ? (
-              <span className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing Document (this may take a minute)...
+              <span className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Scanning Document...
               </span>
             ) : (
-              "Check Document"
+              <span className="flex items-center gap-2 text-base">
+                <Zap className="w-5 h-5 fill-current" />
+                Run Comprehensive Analysis
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </span>
             )}
           </button>
+        </form>
+      </motion.div>
+
+      {/* Feature Highlights Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+        <div className="glass-card p-6 rounded-2xl border border-slate-800/80 hover:border-indigo-500/40 transition-colors group">
+          <div className="w-12 h-12 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <ShieldAlert className="w-6 h-6 text-indigo-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-1">Dual-Pass Plagiarism</h3>
+          <p className="text-sm text-slate-400">
+            Cross-references both internal repository files and live web results with sentence-level accuracy.
+          </p>
         </div>
-      </form>
+
+        <div className="glass-card p-6 rounded-2xl border border-slate-800/80 hover:border-purple-500/40 transition-colors group">
+          <div className="w-12 h-12 rounded-xl bg-purple-600/10 border border-purple-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <Bot className="w-6 h-6 text-purple-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-1">Neural AI Detection</h3>
+          <p className="text-sm text-slate-400">
+            Detects text generated by GPT-4, Claude, Gemini, and open-weight models with confidence breakdown.
+          </p>
+        </div>
+
+        <div className="glass-card p-6 rounded-2xl border border-slate-800/80 hover:border-cyan-500/40 transition-colors group">
+          <div className="w-12 h-12 rounded-xl bg-cyan-600/10 border border-cyan-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <Search className="w-6 h-6 text-cyan-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-1">Interactive Side-by-Side</h3>
+          <p className="text-sm text-slate-400">
+            Inspect line-by-line highlights, source attribution quotes, and instant web citation links.
+          </p>
+        </div>
+      </div>
+
     </div>
   );
 }

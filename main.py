@@ -2,8 +2,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
-from models.database import init_db
+# Load environment variables from .env file
+load_dotenv()
+
+from models.database import init_db, close_db
 from routers import upload, plagiarism, ai_detection, report, auth
 from services.plagiarism_engine import setup_nltk
 from services.ai_detector import load_ai_detector
@@ -15,8 +19,12 @@ async def lifespan(app: FastAPI):
     # Startup
     setup_nltk()          # download punkt_tab + stopwords if missing
     await init_db()       # CREATE TABLE IF NOT EXISTS for all ORM models
-    load_ai_detector()    # download & load transformer model into memory (CPU/CUDA)
+    
+    # Load AI detector model in background so server starts responding immediately
+    import asyncio
+    asyncio.create_task(asyncio.to_thread(load_ai_detector))
     yield
+    await close_db()
     # Shutdown (nothing to clean up yet)
 
 

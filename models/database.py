@@ -1,59 +1,28 @@
 import os
-from collections.abc import AsyncGenerator
+from typing import AsyncGenerator
 
-from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
-from sqlalchemy.orm import DeclarativeBase
+from motor.motor_asyncio import AsyncIOMotorClient
 
-load_dotenv()
+DATABASE_URL = os.environ.get("DATABASE_URL", "mongodb://localhost:27017")
+DB_NAME = "plagiarism_db"
 
-DATABASE_URL: str = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:password@localhost:5432/plagiarism_db",
-)
+client = None
+db = None
 
-# ── Engine ────────────────────────────────────────────────────────────────
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,          # set True to log SQL queries during development
-    pool_pre_ping=True,  # verify connections before handing them out
-    pool_size=10,
-    max_overflow=20,
-)
-
-# ── Session factory ───────────────────────────────────────────────────────
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-
-# ── Declarative base ──────────────────────────────────────────────────────
-class Base(DeclarativeBase):
-    pass
-
-
-# ── Dependency ────────────────────────────────────────────────────────────
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency that yields an async DB session per request."""
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        except Exception:
-            await session.rollback()
-            raise
-
-
-# ── DDL helper (called at app startup) ───────────────────────────────────
 async def init_db() -> None:
-    """Create all tables that are registered on Base.metadata."""
-    # Import all models here so metadata is populated before create_all.
-    from models import document_model, report_model, user_model  # noqa: F401
+    """Initialize MongoDB connection and create indexes if necessary."""
+    global client, db
+    client = AsyncIOMotorClient(DATABASE_URL)
+    db = client[DB_NAME]
+    
+    # Create unique index for users email
+    await db.users.create_index("email", unique=True)
+    
+async def close_db() -> None:
+    """Close MongoDB connection."""
+    if client:
+        client.close()
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def get_db() -> AsyncGenerator:
+    """Dependency that returns the MongoDB database instance."""
+    yield db

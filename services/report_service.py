@@ -21,10 +21,8 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import UploadFile
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.report_model import Report
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from bson import ObjectId
 from models.schemas import (
     AIDetectionResult,
     AIFlaggedSegment,
@@ -107,17 +105,22 @@ def _build_ai_flagged_segments(
     return segments
 
 
-def _to_report_summary(report: Report) -> ReportSummary:
-    """Construct a lightweight ReportSummary from an ORM Report instance."""
-    rj = report.report_json
+def _to_report_summary(row: dict) -> ReportSummary:
+    """Construct a lightweight ReportSummary from a dict."""
+    rj = row["report_json"]
+    
+    # Handle created_at formatting
+    ca = rj.get("created_at") or row.get("created_at")
+    created_at_str = ca.isoformat() if hasattr(ca, "isoformat") else str(ca)
+    
     return ReportSummary(
-        report_id=report.id,
-        filename=report.filename,
+        report_id=str(row["_id"]),
+        filename=row["filename"],
         plagiarism_percentage=rj.get("plagiarism_percentage", 0.0),
         ai_generated_percentage=rj.get("ai_generated_percentage", 0.0),
         ai_label=rj.get("ai_label", "unknown"),
-        created_at=rj.get("created_at", report.created_at.isoformat()),
-        user_id=report.user_id,
+        created_at=created_at_str,
+        user_id=row.get("user_id"),
     )
 
 
@@ -129,7 +132,7 @@ async def generate_combined_report(
     file: UploadFile,
     user_id: Optional[str],
     enable_web_search: bool,
-    db: AsyncSession,
+    db: AsyncIOMotorDatabase,
 ) -> CombinedReport:
     """
     Full pipeline: parse → (plagiarism ∥ AI detect) → combine → persist → return.
@@ -172,7 +175,7 @@ async def generate_combined_report(
     created_at = datetime.now(timezone.utc).isoformat()
 
     report_data = CombinedReport(
-        report_id=0,           # placeholder; overwritten after DB insert
+        report_id="",           # placeholder; overwritten after DB insert
         filename=filename,
         full_text=text,
         plagiarism_percentage=plagiarism_report.overall_percentage,
@@ -189,26 +192,25 @@ async def generate_combined_report(
         document_id=plagiarism_report.document_id,
     )
 
-    # ── 4. Persist to `reports` table ─────────────────────────────────────
-    report_row = Report(
-        user_id=user_id,
-        filename=filename,
-        report_json=report_data.model_dump(),
-    )
-    db.add(report_row)
-    await db.flush()
-    await db.refresh(report_row)
+    # ── 4. Persist to `reports` collection ─────────────────────────────────────
+    report_dict = {
+        "user_id": user_id,
+        "filename": filename,
+        "report_json": report_data.model_dump(),
+        "created_at": datetime.now(timezone.utc),
+    }
+    result = await db.reports.insert_one(report_dict)
 
     # Patch the real DB id back in
-    report_data.report_id = report_row.id
+    report_data.report_id = str(result.inserted_id)
 
     # Persist the final report_json with the real id
-    report_row.report_json = report_data.model_dump()
-    await db.commit()
+    report_dict["report_json"] = report_data.model_dump()
+    await db.reports.update_one({"_id": result.inserted_id}, {"$set": {"report_json": report_dict["report_json"]}})
 
     logger.info(
-        "Report id=%d saved: plagiarism=%.1f%% ai=%.1f%% (%s)",
-        report_row.id,
+        "Report id=%s saved: plagiarism=%.1f%% ai=%.1f%% (%s)",
+        report_data.report_id,
         report_data.plagiarism_percentage,
         report_data.ai_generated_percentage,
         report_data.ai_label,
@@ -220,21 +222,20 @@ async def generate_combined_report(
 # DB read helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def get_report_by_id(report_id: int, db: AsyncSession) -> CombinedReport | None:
+async def get_report_by_id(report_id: str, db: AsyncIOMotorDatabase) -> CombinedReport | None:
     """Fetch a single report by primary key. Returns None if not found."""
-    result = await db.execute(select(Report).where(Report.id == report_id))
-    row: Report | None = result.scalar_one_or_none()
+    try:
+        oid = ObjectId(report_id)
+    except Exception:
+        return None
+    row = await db.reports.find_one({"_id": oid})
     if row is None:
         return None
-    return CombinedReport(**row.report_json)
+    return CombinedReport(**row["report_json"])
 
 
-async def list_reports_for_user(user_id: str, db: AsyncSession) -> list[ReportSummary]:
+async def list_reports_for_user(user_id: str, db: AsyncIOMotorDatabase) -> list[ReportSummary]:
     """Return summary rows for every report belonging to a given user_id."""
-    result = await db.execute(
-        select(Report)
-        .where(Report.user_id == user_id)
-        .order_by(Report.created_at.desc())
-    )
-    rows = result.scalars().all()
+    cursor = db.reports.find({"user_id": user_id}).sort("created_at", -1)
+    rows = await cursor.to_list(length=None)
     return [_to_report_summary(r) for r in rows]

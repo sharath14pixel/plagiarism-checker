@@ -6,14 +6,14 @@ AI-generated text detection using Hugging Face transformers.
 Model
 ─────
   desklib/ai-text-detector-v1.01
-  (AutoTokenizer + AutoModelForSequenceClassification)
+  (AutoTokenizer + DesklibAIDetectionModel)
 
 Pipeline
 ─────────
 1.  Model + tokenizer loaded ONCE at app startup (load_ai_detector).
 2.  For long texts: tokenize → split into 500-token chunks → decode back to str.
 3.  Run inference on each chunk (max 512 tokens, CPU or CUDA).
-4.  Softmax → extract AI-probability per chunk.
+4.  Sigmoid → extract AI-probability per chunk.
 5.  Average AI-probability across all chunks → document-level score.
 6.  Threshold ≥ 50 % → "ai-generated", else "human".
 """
@@ -25,7 +25,9 @@ from typing import Optional
 
 import numpy as np
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import torch.nn as nn
+from transformers import AutoConfig, AutoModel, AutoTokenizer, PreTrainedModel
+from transformers.modeling_outputs import SequenceClassifierOutput
 
 from models.schemas import AIDetectionResult, ChunkAnalysis
 
@@ -37,11 +39,46 @@ CHUNK_SIZE_TOKENS = 500   # tokens per inference chunk (leave room for specials)
 MAX_MODEL_INPUT = 512     # hard limit of the model
 AI_THRESHOLD = 50.0       # AI-probability % above which we label "ai-generated"
 
+
+# ── Custom Model Architecture ──────────────────────────────────────────────────
+class DesklibAIDetectionModel(PreTrainedModel):
+    config_class = AutoConfig
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.model = AutoModel.from_config(config)
+        self.classifier = nn.Linear(config.hidden_size, 1)
+        self.post_init()
+
+    def forward(self, input_ids, attention_mask=None, labels=None, **kwargs):
+        outputs = self.model(input_ids, attention_mask=attention_mask)
+        last_hidden_state = outputs[0]
+        
+        # Mean pooling
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+        sum_embeddings = torch.sum(last_hidden_state * input_mask_expanded, dim=1)
+        sum_mask = torch.clamp(input_mask_expanded.sum(dim=1), min=1e-9)
+        pooled_output = sum_embeddings / sum_mask
+
+        logits = self.classifier(pooled_output)
+        
+        loss = None
+        if labels is not None:
+            loss_fct = nn.BCEWithLogitsLoss()
+            loss = loss_fct(logits.view(-1), labels.float())
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+
 # ── Module-level singletons (populated by load_ai_detector) ──────────────────
 _tokenizer: Optional[AutoTokenizer] = None
-_model: Optional[AutoModelForSequenceClassification] = None
+_model: Optional[DesklibAIDetectionModel] = None
 _device: Optional[torch.device] = None
-_ai_label_idx: int = 1    # default: index 1 → "AI"; overridden from model config
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -53,7 +90,7 @@ def load_ai_detector() -> None:
     Download (first run) and load the model + tokenizer into module globals.
     Safe to call multiple times — skips if already loaded.
     """
-    global _tokenizer, _model, _device, _ai_label_idx
+    global _tokenizer, _model, _device
 
     if _model is not None:
         logger.debug("AI detector already loaded — skipping.")
@@ -67,20 +104,10 @@ def load_ai_detector() -> None:
 
     # ── Load tokenizer & model ────────────────────────────────────────────
     _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    _model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+    _model = DesklibAIDetectionModel.from_pretrained(MODEL_NAME)
     _model.to(_device)
     _model.eval()  # disable dropout etc. for inference
-
-    # ── Discover the AI label index from model config ─────────────────────
-    id2label: dict = getattr(_model.config, "id2label", {})
-    for idx, label_str in id2label.items():
-        if "ai" in str(label_str).lower() or "fake" in str(label_str).lower():
-            _ai_label_idx = int(idx)
-            break
-    logger.info(
-        "Model loaded. id2label=%s  →  AI label index=%d",
-        id2label, _ai_label_idx,
-    )
+    logger.info("Model loaded successfully.")
 
 
 def is_loaded() -> bool:
@@ -138,13 +165,9 @@ def _infer_chunk(chunk_text: str) -> tuple[float, float]:
     inputs = {k: v.to(_device) for k, v in inputs.items()}
 
     with torch.no_grad():
-        logits = _model(**inputs).logits          # shape: (1, num_labels)
+        logits = _model(**inputs).logits          # shape: (1, 1)
 
-    probs: np.ndarray = (
-        torch.softmax(logits, dim=-1)[0].cpu().numpy()
-    )
-
-    ai_prob  = float(probs[_ai_label_idx]) * 100
+    ai_prob = float(torch.sigmoid(logits)[0].cpu().item()) * 100
     # human prob is everything that isn't the AI label
     human_prob = 100.0 - ai_prob
     return ai_prob, human_prob

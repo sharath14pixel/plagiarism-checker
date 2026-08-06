@@ -3,10 +3,22 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { 
+  ShieldCheck, 
+  Mail, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  ArrowRight, 
+  CheckCircle2, 
+  AlertCircle 
+} from "lucide-react";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -16,7 +28,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (searchParams.get("registered") === "true") {
-      setMessage("Registration successful! Please log in.");
+      setMessage("Account created successfully! Please sign in.");
     }
   }, [searchParams]);
 
@@ -29,7 +41,6 @@ function LoginForm() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       
-      // FastAPI OAuth2 requires form data
       const formData = new URLSearchParams();
       formData.append("username", email);
       formData.append("password", password);
@@ -44,12 +55,11 @@ function LoginForm() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.detail || "Login failed");
+        throw new Error(data?.detail || "Invalid email or password");
       }
 
       const data = await res.json();
       
-      // Store token securely
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("user_id", data.user_id);
       
@@ -62,76 +72,122 @@ function LoginForm() {
   };
 
   return (
-    <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-sm border border-gray-100">
-      <div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Log in to your account
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      className="max-w-md w-full glass-panel p-8 sm:p-10 rounded-2xl border border-slate-800/80 shadow-2xl space-y-6 relative overflow-hidden"
+    >
+      <div className="text-center space-y-2">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-400 p-0.5 mx-auto mb-3 shadow-lg shadow-indigo-500/30">
+          <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <ShieldCheck className="w-6 h-6 text-indigo-400" />
+          </div>
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          Welcome back
         </h2>
+        <p className="text-sm text-slate-400">
+          Enter your credentials to access your documents
+        </p>
       </div>
-      <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+
+      <form className="space-y-4" onSubmit={handleLogin}>
         {message && (
-          <div className="bg-green-50 border border-green-100 text-green-700 px-4 py-3 rounded relative text-sm">
-            {message}
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 px-4 py-3 rounded-xl text-sm">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>{message}</span>
           </div>
         )}
+        
         {error && (
-          <div className="bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded relative text-sm">
-            {error}
+          <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 text-rose-300 px-4 py-3 rounded-xl text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{error}</span>
           </div>
         )}
-        <div className="rounded-md shadow-sm -space-y-px">
+
+        <div className="space-y-4">
           <div>
-            <input
-              id="email-address"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-              placeholder="Email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
+            <div className="relative">
+              <Mail className="w-5 h-5 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                id="email-address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="w-full pl-11 pr-4 py-2.5 rounded-xl glass-input text-sm outline-none transition-all"
+                placeholder="name@organization.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
           </div>
+
           <div>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Password</label>
+            <div className="relative">
+              <Lock className="w-5 h-5 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                className="w-full pl-11 pr-11 py-2.5 rounded-xl glass-input text-sm outline-none transition-all"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div>
-          <button
-            type="submit"
-            disabled={loading}
-            className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-          >
-            {loading ? "Logging in..." : "Log in"}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full flex justify-center items-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-600/30 transition-all ${
+            loading ? 'opacity-70 cursor-not-allowed' : ''
+          }`}
+        >
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              <span>Sign In</span>
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
       </form>
-      <div className="text-center text-sm text-gray-600">
+
+      <div className="text-center text-xs text-slate-400 pt-2 border-t border-slate-800">
         Don't have an account?{" "}
-        <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
-          Sign up
+        <Link href="/signup" className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
+          Create account
         </Link>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <Suspense fallback={<div>Loading...</div>}>
+    <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <Suspense fallback={
+        <div className="flex justify-center items-center py-12">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }>
         <LoginForm />
       </Suspense>
     </div>

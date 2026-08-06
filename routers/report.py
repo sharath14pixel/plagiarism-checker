@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from models.database import get_db
 from models.schemas import CombinedReport, ReportSummary
@@ -37,7 +37,7 @@ async def generate_report(
     file: UploadFile = File(..., description="PDF, DOCX, or TXT file to analyse."),
     enable_web_search: bool = Form(True, description="Enable web-based plagiarism matching."),
     current_user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> CombinedReport:
     # ── Validate extension before doing any work ──────────────────────────
     if not file.filename or not is_allowed_file(file.filename):
@@ -79,9 +79,9 @@ async def generate_report(
     summary="Fetch a saved report by ID",
 )
 async def get_report(
-    report_id: int,
+    report_id: str,
     current_user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> CombinedReport:
     report = await get_report_by_id(report_id, db)
     if report is None:
@@ -104,7 +104,7 @@ async def get_report(
 async def list_user_reports(
     user_id: str,
     current_user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> list[ReportSummary]:
     if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Not authorized to view these reports.")

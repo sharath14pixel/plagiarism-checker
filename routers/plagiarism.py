@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from models.database import get_db
 from models.schemas import PlagiarismCheckRequest, PlagiarismReport
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/check-plagiarism", tags=["Plagiarism"])
 async def check_plagiarism(
     payload: PlagiarismCheckRequest,
     current_user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> PlagiarismReport:
     try:
         report = await run_plagiarism_check(

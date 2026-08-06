@@ -35,7 +35,7 @@ class MatchedChunk(BaseModel):
     """A sentence from the input that matched a previously stored internal document."""
     chunk: str = Field(..., description="Original sentence from the submitted text.")
     score: float = Field(..., ge=0.0, le=1.0, description="Cosine similarity score (0–1).")
-    matched_doc_id: int = Field(..., description="ID of the stored document that matched.")
+    matched_doc_id: str = Field(..., description="ID of the stored document that matched.")
     matched_chunk: str = Field(..., description="The matching sentence from the stored document.")
 
 
@@ -56,7 +56,7 @@ class WebMatchedChunk(BaseModel):
 class PlagiarismReport(BaseModel):
     """Full similarity report combining internal-repository and web-based matches."""
 
-    document_id: int = Field(..., description="DB id of the newly stored document.")
+    document_id: str = Field(..., description="DB id of the newly stored document.")
 
     # Granular percentages
     internal_percentage: float = Field(
@@ -149,7 +149,7 @@ class CombinedReport(BaseModel):
     web matching, and AI-generation analysis.
     """
     # Core fields (as specified)
-    report_id: int = Field(..., description="DB id of the saved report.")
+    report_id: str = Field(..., description="DB id of the saved report.")
     filename: str = Field(..., description="Name of the uploaded file.")
     full_text: str = Field(..., description="The complete text of the submitted document.")
     plagiarism_percentage: float = Field(..., ge=0.0, le=100.0, description="Overall plagiarism % (internal + web union).")
@@ -165,12 +165,12 @@ class CombinedReport(BaseModel):
     internal_percentage: float = Field(..., ge=0.0, le=100.0, description="Plagiarism % from internal repository only.")
     web_percentage: float = Field(..., ge=0.0, le=100.0, description="Plagiarism % from web sources only.")
     ai_label: str = Field(..., description="Document-level AI label ('human' or 'ai-generated').")
-    document_id: int = Field(..., description="DB id of the stored document (plagiarism repository).")
+    document_id: str = Field(..., description="DB id of the stored document (plagiarism repository).")
 
 
 class ReportSummary(BaseModel):
     """Lightweight report listing item — used by GET /reports/user/{user_id}."""
-    report_id: int
+    report_id: str
     filename: str
     plagiarism_percentage: float
     ai_generated_percentage: float
@@ -195,7 +195,7 @@ class Token(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     email: str
     created_at: str
 

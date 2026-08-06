@@ -31,10 +31,9 @@ from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from models.document_model import Document
 from models.schemas import MatchedChunk, PlagiarismReport, WebMatchedChunk
 
 logger = logging.getLogger(__name__)
@@ -102,21 +101,17 @@ def preprocess(sentence: str) -> str:
 # Database helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def _save_document(text: str, user_id: Optional[str], db: AsyncSession) -> Document:
-    """Persist the submitted document and return the ORM instance with its new id."""
-    doc = Document(text=text, user_id=user_id)
-    db.add(doc)
-    await db.flush()          # writes to DB and populates doc.id without full commit
-    await db.refresh(doc)
-    return doc
+async def _save_document(text: str, user_id: Optional[str], db: AsyncIOMotorDatabase) -> str:
+    """Persist the submitted document and return its string ID."""
+    doc = {"text": text, "user_id": user_id}
+    result = await db.documents.insert_one(doc)
+    return str(result.inserted_id)
 
 
-async def _fetch_other_documents(exclude_id: int, db: AsyncSession) -> list[Document]:
+async def _fetch_other_documents(exclude_id: str, db: AsyncIOMotorDatabase) -> list[dict]:
     """Return all documents stored *before* this submission."""
-    result = await db.execute(
-        select(Document).where(Document.id != exclude_id)
-    )
-    return list(result.scalars().all())
+    cursor = db.documents.find({"_id": {"$ne": ObjectId(exclude_id)}})
+    return await cursor.to_list(length=None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -152,7 +147,7 @@ async def _run_web_check(
 async def run_plagiarism_check(
     text: str,
     user_id: Optional[str],
-    db: AsyncSession,
+    db: AsyncIOMotorDatabase,
     enable_web_search: bool = True,
 ) -> PlagiarismReport:
     """
@@ -170,14 +165,13 @@ async def run_plagiarism_check(
             valid_input.append((sent, preprocessed))
 
     # ── 2. Persist the document ───────────────────────────────────────────
-    doc = await _save_document(text, user_id, db)
-    logger.info("Saved document id=%d (%d words)", doc.id, len(text.split()))
+    doc_id = await _save_document(text, user_id, db)
+    logger.info("Saved document id=%s (%d words)", doc_id, len(text.split()))
 
     # ── 3. Edge case: no valid input chunks ──────────────────────────────
     if not valid_input:
-        await db.commit()
         return PlagiarismReport(
-            document_id=doc.id,
+            document_id=doc_id,
             internal_percentage=0.0,
             web_percentage=0.0,
             overall_percentage=0.0,
@@ -187,16 +181,15 @@ async def run_plagiarism_check(
         )
 
     # ── 4. Fetch all previously stored documents ─────────────────────────
-    stored_docs = await _fetch_other_documents(exclude_id=doc.id, db=db)
+    stored_docs = await _fetch_other_documents(exclude_id=doc_id, db=db)
 
     # ── 5. Edge case: empty repository — still run web check ────────────
     if not stored_docs:
-        logger.info("Repository is empty – running web check only for doc id=%d", doc.id)
+        logger.info("Repository is empty – running web check only for doc id=%s", doc_id)
         web_matches = await _run_web_check(valid_input, enable_web_search)
         web_pct = _calc_pct(len(web_matches), len(valid_input))
-        await db.commit()
         return PlagiarismReport(
-            document_id=doc.id,
+            document_id=doc_id,
             internal_percentage=0.0,
             web_percentage=web_pct,
             overall_percentage=web_pct,
@@ -207,21 +200,20 @@ async def run_plagiarism_check(
 
     # ── 6. Build stored-chunk corpus ─────────────────────────────────────
     # Each entry: (preprocessed_text, stored_doc_id, original_sentence)
-    StoredChunkEntry = tuple[str, int, str]
+    StoredChunkEntry = tuple[str, str, str]
     stored_chunks: list[StoredChunkEntry] = []
 
     for stored_doc in stored_docs:
-        for sent in tokenize_text(stored_doc.text):
+        for sent in tokenize_text(stored_doc["text"]):
             preprocessed = preprocess(sent)
             if len(preprocessed.split()) >= MIN_TOKENS:
-                stored_chunks.append((preprocessed, stored_doc.id, sent))
+                stored_chunks.append((preprocessed, str(stored_doc["_id"]), sent))
 
     if not stored_chunks:
         web_matches = await _run_web_check(valid_input, enable_web_search)
         web_pct = _calc_pct(len(web_matches), len(valid_input))
-        await db.commit()
         return PlagiarismReport(
-            document_id=doc.id,
+            document_id=doc_id,
             internal_percentage=0.0,
             web_percentage=web_pct,
             overall_percentage=web_pct,
@@ -286,17 +278,16 @@ async def run_plagiarism_check(
     # Sort by descending similarity so the worst offences appear first
     matched_chunks.sort(key=lambda m: m.score, reverse=True)
 
-    await db.commit()
     logger.info(
-        "Doc id=%d: internal=%d/%d (%.1f%%) | web=%d/%d (%.1f%%) | overall=%.1f%%",
-        doc.id,
+        "Doc id=%s: internal=%d/%d (%.1f%%) | web=%d/%d (%.1f%%) | overall=%.1f%%",
+        doc_id,
         len(matched_chunks), total, internal_pct,
         len(web_matches),    total, web_pct,
         overall_pct,
     )
 
     return PlagiarismReport(
-        document_id=doc.id,
+        document_id=doc_id,
         internal_percentage=internal_pct,
         web_percentage=web_pct,
         overall_percentage=overall_pct,
