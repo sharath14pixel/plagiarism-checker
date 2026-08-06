@@ -1,0 +1,3 @@
+Machine learning is a field of study in artificial intelligence concerned with the development and study of statistical algorithms that can learn from data and generalize to unseen data, and thus perform tasks without explicit instructions. Recently, generative adversarial networks have shown great promise in many fields. I am writing this essay to discuss these impacts.
+
+In conclusion, the impact of AI is massive. This sentence is completely original and definitely not copied from Wikipedia. The sky is blue and the grass is green.
