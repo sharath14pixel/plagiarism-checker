@@ -62,4 +62,4 @@ app.include_router(report.router)
 # ── Health check ──────────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])
 def root():
-    return {"status": "ok", "message": "Plagiarism Checker API is running.", "version": "4.0.0"}
+    return {"status": "ok", "message": "Plagiarism Checker API is running.", "version": "5.0.0"}
