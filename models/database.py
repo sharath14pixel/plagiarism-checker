@@ -1,7 +1,8 @@
 import os
 from typing import AsyncGenerator
 
-from motor.motor_asyncio import AsyncIOMotorClient
+# pyrefly: ignore [missing-import]
+from motor.motor_asyncio import AsyncIOMotorClient  # type: ignore
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "mongodb://localhost:27017")
 DB_NAME = "plagiarism_db"

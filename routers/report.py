@@ -1,7 +1,8 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from motor.motor_asyncio import AsyncIOMotorDatabase
+# pyrefly: ignore [missing-import]
+from motor.motor_asyncio import AsyncIOMotorDatabase  # type: ignore
 
 from models.database import get_db
 from models.schemas import CombinedReport, ReportSummary
@@ -30,7 +31,7 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
         "2. **Internal plagiarism check** — TF-IDF cosine similarity vs stored documents\n"
         "3. **Web plagiarism check** — Google Custom Search + page scraping (optional)\n"
         "4. **AI-generation detection** — desklib/ai-text-detector-v1.01 transformer\n\n"
-        "The combined report is saved to PostgreSQL and returned as JSON."
+        "The combined report is saved to MongoDB and returned as JSON."
     ),
 )
 async def generate_report(

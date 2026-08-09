@@ -7,7 +7,7 @@ Pipeline
 ────────
 1.  Sentence-tokenise the submitted text with NLTK.
 2.  Pre-process each chunk (lower-case → strip punctuation → remove stopwords).
-3.  Save the raw document to PostgreSQL (documents table).
+3.  Save the raw document to MongoDB (documents collection).
 4.  Fetch every previously stored document from the DB.
 5.  Tokenise + pre-process stored documents in the same way.
 6.  Fit a single TfidfVectorizer over *all* chunks (input + stored).
@@ -25,14 +25,15 @@ import string
 import logging
 from typing import Optional
 
-import nltk
+# pyrefly: ignore [missing-import]
+import nltk  # type: ignore
 import numpy as np
-from nltk.corpus import stopwords
-from nltk.tokenize import sent_tokenize
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from nltk.corpus import stopwords  # type: ignore
+from nltk.tokenize import sent_tokenize  # type: ignore
+from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
+from sklearn.metrics.pairwise import cosine_similarity  # type: ignore
+from bson import ObjectId  # type: ignore
+from motor.motor_asyncio import AsyncIOMotorDatabase  # type: ignore
 
 from models.schemas import MatchedChunk, PlagiarismReport, WebMatchedChunk
 

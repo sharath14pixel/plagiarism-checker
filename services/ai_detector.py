@@ -23,11 +23,12 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+# pyrefly: ignore [missing-import]
 import numpy as np
-import torch
-import torch.nn as nn
-from transformers import AutoConfig, AutoModel, AutoTokenizer, PreTrainedModel
-from transformers.modeling_outputs import SequenceClassifierOutput
+import torch  # type: ignore
+import torch.nn as nn  # type: ignore
+from transformers import AutoConfig, AutoModel, AutoTokenizer, PreTrainedModel  # type: ignore
+from transformers.modeling_outputs import SequenceClassifierOutput  # type: ignore
 
 from models.schemas import AIDetectionResult, ChunkAnalysis
 

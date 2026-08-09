@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from motor.motor_asyncio import AsyncIOMotorDatabase
+# pyrefly: ignore [missing-import]
+from motor.motor_asyncio import AsyncIOMotorDatabase  # type: ignore
 
 from models.database import get_db
 from models.schemas import PlagiarismCheckRequest, PlagiarismReport

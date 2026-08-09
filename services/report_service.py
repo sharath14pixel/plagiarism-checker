@@ -21,8 +21,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import UploadFile
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# pyrefly: ignore [missing-import]
+from motor.motor_asyncio import AsyncIOMotorDatabase  # type: ignore
+from bson import ObjectId  # type: ignore
 from models.schemas import (
     AIDetectionResult,
     AIFlaggedSegment,

@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+.git
+.vscode
+.idea
+frontend/

@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from motor.motor_asyncio import AsyncIOMotorDatabase
+# pyrefly: ignore [missing-import]
+from motor.motor_asyncio import AsyncIOMotorDatabase  # type: ignore
 
 from models.database import get_db
 from models.schemas import Token, UserCreate, UserResponse

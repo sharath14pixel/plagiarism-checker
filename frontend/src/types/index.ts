@@ -11,7 +11,7 @@ export interface AIFlaggedSegment {
 }
 
 export interface CombinedReport {
-  report_id: number;
+  report_id: string;
   filename: string;
   full_text: string;
   plagiarism_percentage: number;
@@ -25,11 +25,11 @@ export interface CombinedReport {
   internal_percentage: number;
   web_percentage: number;
   ai_label: string;
-  document_id: number;
+  document_id: string;
 }
 
 export interface ReportSummary {
-  report_id: number;
+  report_id: string;
   filename: string;
   plagiarism_percentage: number;
   ai_generated_percentage: number;
@@ -37,3 +37,4 @@ export interface ReportSummary {
   created_at: string;
   user_id?: string;
 }
+
