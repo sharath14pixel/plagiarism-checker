@@ -14,6 +14,7 @@ import {
   CheckCircle2, 
   AlertCircle 
 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -39,13 +40,11 @@ function LoginForm() {
     setMessage(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      
       const formData = new URLSearchParams();
       formData.append("username", email);
       formData.append("password", password);
 
-      const res = await fetch(`${apiUrl}/auth/login`, {
+      const res = await apiFetch("/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",

@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Filter
 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function DashboardPage() {
   const [reports, setReports] = useState<ReportSummary[]>([]);
@@ -39,8 +40,7 @@ export default function DashboardPage() {
         return;
       }
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const res = await fetch(`${apiUrl}/reports/user/${userId}`, {
+        const res = await apiFetch(`/reports/user/${userId}`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }

@@ -40,12 +40,18 @@ app = FastAPI(
 )
 
 # ── CORS – configurable origins for production/development ───────────────────
-raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
-origins = [org.strip() for org in raw_origins.split(",") if org.strip()]
+raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,https://plagiarism-checkerr.vercel.app")
+origins = [org.strip().rstrip("/") for org in raw_origins.split(",") if org.strip()]
+
+# Ensure common defaults are present
+for default_origin in ["http://localhost:3000", "http://127.0.0.1:3000", "https://plagiarism-checkerr.vercel.app"]:
+    if default_origin not in origins:
+        origins.append(default_origin)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

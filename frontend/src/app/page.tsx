@@ -18,6 +18,7 @@ import {
   Lock,
   Search
 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -92,8 +93,7 @@ export default function Home() {
     const stepTimer2 = setTimeout(() => setLoadingStep(3), 3000);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/reports/generate`, {
+      const response = await apiFetch("/reports/generate", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

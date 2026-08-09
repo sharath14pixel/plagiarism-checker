@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   AlertTriangle
 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const unwrappedParams = use(params);
@@ -39,8 +40,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         return;
       }
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const res = await fetch(`${apiUrl}/reports/${unwrappedParams.id}`, {
+        const res = await apiFetch(`/reports/${unwrappedParams.id}`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }

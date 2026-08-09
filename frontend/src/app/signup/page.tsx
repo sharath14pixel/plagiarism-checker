@@ -13,6 +13,7 @@ import {
   ArrowRight, 
   AlertCircle 
 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -28,8 +29,7 @@ export default function SignupPage() {
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/auth/signup`, {
+      const res = await apiFetch("/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -37,12 +37,12 @@ export default function SignupPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.detail || "Registration failed");
+        throw new Error(data?.detail || "Registration failed. Please check your credentials.");
       }
 
       router.push("/login?registered=true");
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Unable to complete registration. Please try again.");
     } finally {
       setLoading(false);
     }

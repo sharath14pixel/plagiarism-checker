@@ -20,28 +20,36 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def signup(user_data: UserCreate, db: AsyncIOMotorDatabase = Depends(get_db)):
     """Register a new user."""
-    # Check if user already exists
-    existing_user = await db.users.find_one({"email": user_data.email})
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
-        )
+    try:
+        # Check if user already exists
+        existing_user = await db.users.find_one({"email": user_data.email.lower().strip()})
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered. Please log in.",
+            )
 
-    # Create new user
-    hashed_pwd = get_password_hash(user_data.password)
-    new_user_dict = {
-        "email": user_data.email,
-        "hashed_password": hashed_pwd,
-        "created_at": datetime.utcnow()
-    }
-    result = await db.users.insert_one(new_user_dict)
-    
-    return UserResponse(
-        id=str(result.inserted_id),
-        email=new_user_dict["email"],
-        created_at=new_user_dict["created_at"].isoformat(),
-    )
+        # Create new user
+        hashed_pwd = get_password_hash(user_data.password)
+        new_user_dict = {
+            "email": user_data.email.lower().strip(),
+            "hashed_password": hashed_pwd,
+            "created_at": datetime.utcnow()
+        }
+        result = await db.users.insert_one(new_user_dict)
+        
+        return UserResponse(
+            id=str(result.inserted_id),
+            email=new_user_dict["email"],
+            created_at=new_user_dict["created_at"].isoformat(),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Registration error: {str(exc)}"
+        )
 
 
 @router.post("/login", response_model=Token)
