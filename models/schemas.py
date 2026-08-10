@@ -192,11 +192,14 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user_id: str
+    email: Optional[str] = None
 
 
 class UserResponse(BaseModel):
     id: str
     email: str
     created_at: str
+    access_token: Optional[str] = None
+    token_type: str = "bearer"
 
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ReportSummary } from "@/types";
 import { 
@@ -10,47 +9,34 @@ import {
   Search, 
   UploadCloud, 
   ShieldAlert, 
-  Bot, 
-  ArrowRight, 
-  CheckCircle2, 
-  AlertTriangle, 
   Clock, 
   BarChart3,
   ChevronRight,
   Filter
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-export default function DashboardPage() {
+function DashboardContent() {
+  const { user, token } = useAuth();
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRisk, setFilterRisk] = useState<"all" | "high" | "moderate" | "clean">("all");
-  
-  const router = useRouter();
 
   useEffect(() => {
     const fetchReports = async () => {
-      const token = localStorage.getItem("access_token");
-      const userId = localStorage.getItem("user_id");
+      if (!token || !user?.id) return;
       
-      if (!token || !userId) {
-        router.push("/login");
-        return;
-      }
       try {
-        const res = await apiFetch(`/reports/user/${userId}`, {
+        const res = await apiFetch(`/reports/user/${user.id}`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
         });
         
-        if (res.status === 401) {
-          localStorage.removeItem("access_token");
-          router.push("/login");
-          return;
-        }
         if (!res.ok) {
           throw new Error("Failed to fetch document reports");
         }
@@ -64,7 +50,7 @@ export default function DashboardPage() {
     };
 
     fetchReports();
-  }, [router]);
+  }, [user, token]);
 
   // Derived stats
   const totalReports = reports.length;
@@ -302,5 +288,13 @@ export default function DashboardPage() {
       )}
 
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
   );
 }

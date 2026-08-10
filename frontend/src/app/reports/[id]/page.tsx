@@ -21,9 +21,12 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-export default function ReportPage({ params }: { params: Promise<{ id: string }> }) {
+function ReportContent({ params }: { params: Promise<{ id: string }> }) {
   const unwrappedParams = use(params);
+  const { token, logout } = useAuth();
   const [report, setReport] = useState<CombinedReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,9 +37,8 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 
   useEffect(() => {
     const fetchReport = async () => {
-      const token = localStorage.getItem("access_token");
       if (!token) {
-        router.push("/login");
+        logout();
         return;
       }
       try {
@@ -47,8 +49,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
         });
         
         if (res.status === 401) {
-          localStorage.removeItem("access_token");
-          router.push("/login");
+          logout();
           return;
         }
         if (!res.ok) {
@@ -64,7 +65,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
     };
 
     fetchReport();
-  }, [unwrappedParams.id, router]);
+  }, [unwrappedParams.id, token, logout]);
 
   const handlePrint = () => {
     window.print();
@@ -420,5 +421,13 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
       )}
 
     </div>
+  );
+}
+
+export default function ReportPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <ProtectedRoute>
+      <ReportContent params={params} />
+    </ProtectedRoute>
   );
 }

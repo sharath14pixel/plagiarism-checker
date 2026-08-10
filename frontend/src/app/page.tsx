@@ -19,8 +19,11 @@ import {
   Search
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-export default function Home() {
+function HomeContent() {
+  const { token, logout } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [enableWebSearch, setEnableWebSearch] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -78,9 +81,8 @@ export default function Home() {
     setError(null);
     setLoadingStep(1);
 
-    const token = localStorage.getItem("access_token");
     if (!token) {
-      router.push("/login");
+      logout();
       return;
     }
 
@@ -105,8 +107,7 @@ export default function Home() {
       clearTimeout(stepTimer2);
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
-        router.push("/login");
+        logout();
         return;
       }
 
@@ -385,5 +386,13 @@ export default function Home() {
       </div>
 
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <ProtectedRoute>
+      <HomeContent />
+    </ProtectedRoute>
   );
 }

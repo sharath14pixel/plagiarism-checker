@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 # pyrefly: ignore [missing-import]
@@ -10,6 +11,7 @@ from models.schemas import Token, UserCreate, UserResponse
 from utils.auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_access_token,
+    get_current_user,
     get_password_hash,
     verify_password,
 )
@@ -19,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def signup(user_data: UserCreate, db: AsyncIOMotorDatabase = Depends(get_db)):
-    """Register a new user."""
+    """Register a new user and issue an access token directly."""
     try:
         # Check if user already exists
         existing_user = await db.users.find_one({"email": user_data.email.lower().strip()})
@@ -37,11 +39,20 @@ async def signup(user_data: UserCreate, db: AsyncIOMotorDatabase = Depends(get_d
             "created_at": datetime.utcnow()
         }
         result = await db.users.insert_one(new_user_dict)
+        user_id = str(result.inserted_id)
+
+        # Generate JWT immediately on signup
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user_id}, expires_delta=access_token_expires
+        )
         
         return UserResponse(
-            id=str(result.inserted_id),
+            id=user_id,
             email=new_user_dict["email"],
             created_at=new_user_dict["created_at"].isoformat(),
+            access_token=access_token,
+            token_type="bearer"
         )
     except HTTPException:
         raise
@@ -59,7 +70,7 @@ async def login(
 ):
     """Authenticate a user and return a JWT access token."""
     # Authenticate user
-    user = await db.users.find_one({"email": form_data.username})
+    user = await db.users.find_one({"email": form_data.username.lower().strip()})
     
     if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
@@ -74,4 +85,40 @@ async def login(
         data={"sub": str(user["_id"])}, expires_delta=access_token_expires
     )
 
-    return Token(access_token=access_token, user_id=str(user["_id"]))
+    return Token(
+        access_token=access_token,
+        user_id=str(user["_id"]),
+        email=user["email"]
+    )
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(
+    current_user_id: str = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Get profile of current authenticated user."""
+    try:
+        user = await db.users.find_one({"_id": ObjectId(current_user_id)})
+    except Exception:
+        user = None
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    created_at_val = user.get("created_at")
+    created_at_str = (
+        created_at_val.isoformat() 
+        if isinstance(created_at_val, datetime) 
+        else str(created_at_val or "")
+    )
+
+    return UserResponse(
+        id=str(user["_id"]),
+        email=user["email"],
+        created_at=created_at_str,
+    )
+

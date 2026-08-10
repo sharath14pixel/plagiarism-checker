@@ -11,10 +11,11 @@ import {
   Eye, 
   EyeOff, 
   ArrowRight, 
-  CheckCircle2, 
   AlertCircle 
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import PublicOnlyRoute from "@/components/PublicOnlyRoute";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -22,26 +23,21 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  
+
+  const { setSession } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    if (searchParams.get("registered") === "true") {
-      setMessage("Account created successfully! Please sign in.");
-    }
-  }, [searchParams]);
+  const redirectTarget = searchParams.get("redirect") || "/dashboard";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setMessage(null);
 
     try {
       const formData = new URLSearchParams();
-      formData.append("username", email);
+      formData.append("username", email.trim());
       formData.append("password", password);
 
       const res = await apiFetch("/auth/login", {
@@ -52,19 +48,23 @@ function LoginForm() {
         body: formData.toString(),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.detail || "Invalid email or password");
+        throw new Error(data?.detail || "Incorrect email or password");
       }
 
-      const data = await res.json();
-      
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("user_id", data.user_id);
-      
-      router.push("/");
+      if (data?.access_token && data?.user_id) {
+        // Save session synchronously in context & localStorage
+        setSession(data.access_token, data.user_id, data.email || email.trim());
+
+        // Redirect to intended route or dashboard
+        router.push(redirectTarget);
+      } else {
+        throw new Error("Login failed. No token returned from server.");
+      }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Incorrect email or password");
     } finally {
       setLoading(false);
     }
@@ -92,13 +92,6 @@ function LoginForm() {
       </div>
 
       <form className="space-y-4" onSubmit={handleLogin}>
-        {message && (
-          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 px-4 py-3 rounded-xl text-sm">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-            <span>{message}</span>
-          </div>
-        )}
-        
         {error && (
           <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 text-rose-300 px-4 py-3 rounded-xl text-sm">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
@@ -153,9 +146,9 @@ function LoginForm() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !email || !password}
           className={`w-full flex justify-center items-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 shadow-lg shadow-indigo-600/30 transition-all ${
-            loading ? 'opacity-70 cursor-not-allowed' : ''
+            loading || !email || !password ? 'opacity-70 cursor-not-allowed' : ''
           }`}
         >
           {loading ? (
@@ -181,14 +174,16 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <Suspense fallback={
-        <div className="flex justify-center items-center py-12">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      }>
-        <LoginForm />
-      </Suspense>
-    </div>
+    <PublicOnlyRoute>
+      <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <Suspense fallback={
+          <div className="flex justify-center items-center py-12">
+            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }>
+          <LoginForm />
+        </Suspense>
+      </div>
+    </PublicOnlyRoute>
   );
 }

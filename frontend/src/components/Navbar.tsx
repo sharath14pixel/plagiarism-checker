@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { 
   ShieldCheck, 
   UploadCloud, 
@@ -11,32 +10,15 @@ import {
   LogIn, 
   UserPlus, 
   Sparkles,
-  FileText
+  User
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const router = useRouter();
+  const { user, logout, isLoading } = useAuth();
   const pathname = usePathname();
 
-  useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem("access_token");
-      setIsLoggedIn(!!token);
-    };
-
-    checkAuth();
-    // Listen to storage changes in case of multi-tab login/logout
-    window.addEventListener("storage", checkAuth);
-    return () => window.removeEventListener("storage", checkAuth);
-  }, [pathname]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user_id");
-    setIsLoggedIn(false);
-    router.push("/login");
-  };
+  const isLoggedIn = !!user;
 
   return (
     <nav className="glass-panel sticky top-0 z-50 border-b border-slate-800/80 shadow-lg shadow-black/40">
@@ -92,14 +74,16 @@ export default function Navbar() {
 
           {/* Right Action Menu */}
           <div className="flex items-center gap-3">
-            {isLoggedIn ? (
+            {isLoading ? (
+              <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+            ) : isLoggedIn ? (
               <div className="flex items-center gap-3">
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="font-mono text-slate-300">Session Active</span>
+                  <User className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="font-mono text-slate-300 truncate max-w-[160px]">{user.email}</span>
                 </div>
                 <button
-                  onClick={handleLogout}
+                  onClick={logout}
                   className="flex items-center gap-2 text-slate-300 hover:text-rose-400 bg-slate-900/80 hover:bg-rose-950/30 border border-slate-800 hover:border-rose-800/50 px-3.5 py-2 rounded-xl text-sm font-medium transition-all"
                   title="Sign out of account"
                 >
